@@ -87,7 +87,7 @@ FlatlandViz::FlatlandViz(FlatlandWindow* parent) : QWidget((QWidget*)parent) {
   // init toolbar action handler
   initToolbars();
 
-  initMenus();
+  //   initMenus();
 
   // Construct and lay out render panel.
   render_panel_ = new rviz::RenderPanel();
@@ -175,11 +175,11 @@ void FlatlandViz::indicateToolIsCurrent(rviz::Tool* tool) {
 }
 
 void FlatlandViz::setDisplayConfigModified() {
-  ROS_ERROR("setDisplayConfigModified called");
+  //   ROS_ERROR("setDisplayConfigModified called");
 }
 
 void FlatlandViz::addTool(rviz::Tool* tool) {
-  ROS_ERROR("addTool called");
+  //   ROS_ERROR("addTool called");
   QAction* action = new QAction(tool->getName(), toolbar_actions_);
   action->setIcon(tool->getIcon());
   action->setIconText(tool->getName());
@@ -192,7 +192,7 @@ void FlatlandViz::addTool(rviz::Tool* tool) {
 }
 
 void FlatlandViz::onToolbarActionTriggered(QAction* action) {
-  ROS_ERROR("onToolbarActionTriggered called");
+  //   ROS_ERROR("onToolbarActionTriggered called");
 
   rviz::Tool* current_tool = manager_->getToolManager()->getCurrentTool();
   rviz::Tool* tool = action_to_tool_map_[action];

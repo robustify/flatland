@@ -332,7 +332,14 @@ void World::Pause() { service_paused_ = true; }
 
 void World::Resume() { service_paused_ = false; }
 
-void World::TogglePaused() { service_paused_ = !service_paused_; }
+void World::TogglePaused() {
+  service_paused_ = !service_paused_;
+  if (service_paused_) {
+    ROS_INFO_NAMED("World", "Simulation paused");
+  } else {
+    ROS_INFO_NAMED("World", "Simulation resumed");
+  }
+}
 
 bool World::IsPaused() {
   return service_paused_ || int_marker_manager_.isManipulating();
