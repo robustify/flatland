@@ -202,6 +202,16 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
     if (enable_odom_pub_) {
       ground_truth_pub_.publish(ground_truth_msg_);
       odom_pub_.publish(odom_msg_);
+
+      // publish odom tf
+      geometry_msgs::TransformStamped odom_tf;
+      odom_tf.header = odom_msg_.header;
+      odom_tf.child_frame_id = odom_msg_.child_frame_id;
+      odom_tf.transform.translation.x = odom_msg_.pose.pose.position.x;
+      odom_tf.transform.translation.y = odom_msg_.pose.pose.position.y;
+      odom_tf.transform.translation.z = 0;
+      odom_tf.transform.rotation = odom_msg_.pose.pose.orientation;
+      tf_broadcaster.sendTransform(odom_tf);
     }
 
     if (enable_twist_pub_) {
@@ -220,16 +230,6 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
       twist_pub_msg.twist.angular.z = angular_vel + noise_gen_[5](rng_);
       twist_pub_.publish(twist_pub_msg);
     }
-
-    // publish odom tf
-    geometry_msgs::TransformStamped odom_tf;
-    odom_tf.header = odom_msg_.header;
-    odom_tf.child_frame_id = odom_msg_.child_frame_id;
-    odom_tf.transform.translation.x = odom_msg_.pose.pose.position.x;
-    odom_tf.transform.translation.y = odom_msg_.pose.pose.position.y;
-    odom_tf.transform.translation.z = 0;
-    odom_tf.transform.rotation = odom_msg_.pose.pose.orientation;
-    tf_broadcaster.sendTransform(odom_tf);
   }
 
   // we apply the twist velocities, this must be done every physics step to make
