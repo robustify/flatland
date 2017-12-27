@@ -1,10 +1,8 @@
-==========
-Change Log
-==========
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Changelog for package flatland
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This project adheres to `Semantic Versioning <http://semver.org/>`_.
-
-1.0.0 (unreleased)
-------------------
-* Initial version
-
+Forthcoming
+-----------
+* Current version for creating a binary for students to use
+* Contributors: Joseph Duchesne
