@@ -6,10 +6,10 @@
  *   \ \ \/\ \ \ \_/ |\ \ \/\ \L\ \ \ \L\ \/\ \L\ \ \ \_/\__, `\
  *    \ \_\ \_\ \___/  \ \_\ \___,_\ \_,__/\ \____/\ \__\/\____/
  *     \/_/\/_/\/__/    \/_/\/__,_ /\/___/  \/___/  \/__/\/___/
- * @copyright Copyright 2017 Avidbots Corp.
- * @name	 entity.h
- * @brief	 Defines flatland Entity
- * @author Chunshang Li
+ * @copyright Copyright 2018 Avidbots Corp.
+ * @name	 yaml_preprocessor.h
+ * @brief	 Yaml preprocessor using Lua
+ * @author Joseph Duchesne
  *
  * Software License Agreement (BSD License)
  *
@@ -44,68 +44,63 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef FLATLAND_SERVER_ENTITY_H
-#define FLATLAND_SERVER_ENTITY_H
+#ifndef FLATLAND_SERVER_YAML_PREPROCESSOR_H
+#define FLATLAND_SERVER_YAML_PREPROCESSOR_H
 
-#include <Box2D/Box2D.h>
-#include <flatland_server/yaml_reader.h>
+#include <flatland_server/exceptions.h>
 #include <yaml-cpp/yaml.h>
+
+#include <lauxlib.h>
+#include <lua.h>
+#include <lualib.h>
+#include <set>
+#include <string>
+#include <vector>
 
 namespace flatland_server {
 
 /**
- * This class defines a entity in the simulation world. It provides a class
- * for high level physical things in the world to inherit from (layers and
- * models)
  */
-class Entity {
- public:
-  /// Defines the type of entity
-  enum EntityType { LAYER, MODEL };
+namespace YamlPreprocessor {
+/**
+ * @brief Preprocess with a given node
+ * @param[in/out] node A Yaml node to parse
+ * @return The parsed YAML::Node
+ */
+void Parse(YAML::Node &node);
 
-  b2World *physics_world_;  ///< Box2D physics world
-  std::string name_;        ///< name of the entity
+/**
+ * @brief Constructor with a given path to a yaml file, throws exception on
+ * failure
+ * @param[in] path Path to the yaml file
+ * @return The parsed YAML::Node
+ */
+YAML::Node LoadParse(const std::string &path);
 
-  /**
-   * @brief Constructor for the entity
-   * @param[in] physics_world Box2D physics_world
-   * @param[in] name name of the entity
-   */
-  Entity(b2World *physics_world, const std::string &name);
-  virtual ~Entity() = default;
+/**
+ * @brief Find and run any $eval nodes
+ * @param[in/out] node A Yaml node to recursively parse
+ */
+void ProcessNodes(YAML::Node &node);
 
-  /**
-   * @return name of the entity
-   */
-  const std::string &GetName() const;
+/**
+ * @brief Find and run any $eval expressions
+ * @param[in/out] node A Yaml string node to parse
+ */
+void ProcessScalarNode(YAML::Node &node);
 
-  /**
-   * @brief Get Box2D physics world
-   * @return Pointer to Box2D physics world, use this to call Box2D world
-   * methods
-   */
-  b2World *GetPhysicsWorld();
+/**
+  * @brief Get an environment variable with an optional default value
+  * @param[in/out] lua_State The lua state/stack to read/write to/from
+  */
+int LuaGetEnv(lua_State *L);
 
-  /// This class should be non-copyable. This will cause the destructor to be
-  /// called twice for a given b2Body
-  Entity(const Entity &) = delete;
-  Entity &operator=(const Entity &) = delete;
-
-  /**
-   * @brief Get the type of entity, subclasses must override
-   * @return the type of entity
-   */
-  virtual EntityType Type() const = 0;
-
-  /**
-   * @brief Visualize the entity
-   */
-  virtual void DebugVisualize() const = 0;
-
-  /**
-   * @brief Print debug message for the entity
-   */
-  virtual void DebugOutput() const = 0;
+/**
+  * @brief Get a rosparam with an optional default value
+  * @param[in/out] lua_State The lua state/stack to read/write to/from
+  */
+int LuaGetParam(lua_State *L);
 };
-};      // namespace flatland_server
-#endif  // FLATLAND_SERVER_ENTITY_H
+}
+
+#endif  // FLATLAND_SERVER_YAML_PREPROCESSOR_H

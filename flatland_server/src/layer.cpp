@@ -55,6 +55,8 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>
 #include <fstream>
+#include <iostream>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <sstream>
 
@@ -63,12 +65,13 @@ namespace flatland_server {
 Layer::Layer(b2World *physics_world, CollisionFilterRegistry *cfr,
              const std::vector<std::string> &names, const Color &color,
              const Pose &origin, const cv::Mat &bitmap, double occupied_thresh,
-             double resolution)
+             double resolution, const YAML::Node &properties)
     : Entity(physics_world, names[0]),
       names_(names),
       cfr_(cfr),
-      viz_name_("layer/" + name_) {
-  body_ = new Body(physics_world_, this, name_, color, origin, b2_staticBody);
+      viz_name_("layer/" + names[0]) {
+  body_ = new Body(physics_world_, this, name_, color, origin, b2_staticBody,
+                   properties);
 
   LoadFromBitmap(bitmap, occupied_thresh, resolution);
 }
@@ -76,9 +79,13 @@ Layer::Layer(b2World *physics_world, CollisionFilterRegistry *cfr,
 Layer::Layer(b2World *physics_world, CollisionFilterRegistry *cfr,
              const std::vector<std::string> &names, const Color &color,
              const Pose &origin, const std::vector<LineSegment> &line_segments,
-             double scale)
-    : Entity(physics_world, names[0]), names_(names), cfr_(cfr) {
-  body_ = new Body(physics_world_, this, name_, color, origin, b2_staticBody);
+             double scale, const YAML::Node &properties)
+    : Entity(physics_world, names[0]),
+      names_(names),
+      cfr_(cfr),
+      viz_name_("layer/" + names[0]) {
+  body_ = new Body(physics_world_, this, name_, color, origin, b2_staticBody,
+                   properties);
 
   uint16_t category_bits = cfr_->GetCategoryBits(names_);
 
@@ -98,8 +105,12 @@ Layer::Layer(b2World *physics_world, CollisionFilterRegistry *cfr,
 }
 
 Layer::Layer(b2World *physics_world, CollisionFilterRegistry *cfr,
-             const std::vector<std::string> &names, const Color &color)
-    : Entity(physics_world, names[0]), names_(names), cfr_(cfr) {}
+             const std::vector<std::string> &names, const Color &color,
+             const YAML::Node &properties)
+    : Entity(physics_world, names[0]),
+      names_(names),
+      cfr_(cfr),
+      viz_name_("layer/" + names[0]) {}
 
 Layer::~Layer() { delete body_; }
 
@@ -111,7 +122,7 @@ Body *Layer::GetBody() { return body_; }
 Layer *Layer::MakeLayer(b2World *physics_world, CollisionFilterRegistry *cfr,
                         const std::string &map_path,
                         const std::vector<std::string> &names,
-                        const Color &color) {
+                        const Color &color, const YAML::Node &properties) {
   if (map_path.length() > 0) {  // If there is a map in this layer
     YamlReader reader(map_path);
     reader.SetErrorInfo("layer " + Q(names[0]));
@@ -135,7 +146,7 @@ Layer *Layer::MakeLayer(b2World *physics_world, CollisionFilterRegistry *cfr,
       ReadLineSegmentsFile(data_path.string(), line_segments);
 
       return new Layer(physics_world, cfr, names, color, origin, line_segments,
-                       scale);
+                       scale, properties);
 
     } else {
       double resolution = reader.Get<double>("resolution");
@@ -161,10 +172,10 @@ Layer *Layer::MakeLayer(b2World *physics_world, CollisionFilterRegistry *cfr,
       map.convertTo(bitmap, CV_32FC1, 1.0 / 255.0);
 
       return new Layer(physics_world, cfr, names, color, origin, bitmap,
-                       occupied_thresh, resolution);
+                       occupied_thresh, resolution, properties);
     }
   } else {  // If the layer has no static obstacles
-    return new Layer(physics_world, cfr, names, color);
+    return new Layer(physics_world, cfr, names, color, properties);
   }
 }
 
@@ -185,7 +196,7 @@ void Layer::ReadLineSegmentsFile(const std::string &file_path,
     std::stringstream ss(line);
     float n[4];
 
-    for (int i = 0; i < 4; i++) {
+    for (unsigned int i = 0; i < 4; i++) {
       ss >> n[i];
 
       if (ss.fail()) {
@@ -245,7 +256,7 @@ void Layer::LoadFromBitmap(const cv::Mat &bitmap, double occupied_thresh,
     bool started = false;
 
     // find all the walls, put the connected walls as a single line segment
-    for (int j = 0; j <= diff.total(); j++) {
+    for (unsigned int j = 0; j <= diff.total(); j++) {
       bool edge_exists = false;
       if (j < diff.total()) {
         edge_exists = diff.at<uint8_t>(0, j);  // 255 maps to true
@@ -277,7 +288,7 @@ void Layer::LoadFromBitmap(const cv::Mat &bitmap, double occupied_thresh,
     int start = 0;
     bool started = false;
 
-    for (int j = 0; j <= diff.total(); j++) {
+    for (unsigned int j = 0; j <= diff.total(); j++) {
       bool edge_exists = false;
       if (j < diff.total()) {
         edge_exists = diff.at<uint8_t>(j, 0);
@@ -296,11 +307,19 @@ void Layer::LoadFromBitmap(const cv::Mat &bitmap, double occupied_thresh,
 }
 
 void Layer::DebugVisualize() const {
+  // Don't try to visualized uninitalized layers
+  if (viz_name_.length() == 0) {
+    return;
+  }
+
   DebugVisualization::Get().Reset(viz_name_);
+  DebugVisualization::Get().Reset(viz_name_ + "_3d");
+
   if (body_ != nullptr) {
     DebugVisualization::Get().Visualize(viz_name_, body_->physics_body_,
                                         body_->color_.r, body_->color_.g,
                                         body_->color_.b, body_->color_.a);
+    DebugVisualization::Get().VisualizeLayer(viz_name_ + "_3d", body_);
   }
 }
 

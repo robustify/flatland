@@ -46,6 +46,7 @@
 
 #include "flatland_server/debug_visualization.h"
 #include <Box2D/Box2D.h>
+#include <flatland_server/timekeeper.h>
 #include <gtest/gtest.h>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -78,8 +79,8 @@ TEST(DebugVizTest, testBodyToMarkersPolygon) {
 
   // Check that
   ASSERT_EQ(markers.markers[0].header.frame_id, "map");
-  ASSERT_NE(markers.markers[0].header.stamp.sec, 0);
-  ASSERT_NE(markers.markers[0].header.stamp.nsec, 0);
+  ASSERT_EQ(markers.markers[0].header.stamp.sec, 0);
+  ASSERT_EQ(markers.markers[0].header.stamp.nsec, 0);
 
   // Check color setting
   ASSERT_NEAR(markers.markers[0].color.r, 1.0, 1e-5);
@@ -323,7 +324,7 @@ TEST(DebugVizTest, testJointToMarkersMultiJoint) {
   ASSERT_EQ(markers.markers[0].type, markers.markers[0].LINE_LIST);
   ASSERT_EQ(markers.markers[0].points.size(), 6);
 
-  for (int i = 0; i < 6; i++) {
+  for (unsigned int i = 0; i < 6; i++) {
     ASSERT_FLOAT_EQ(markers.markers[0].points[i].x, 0.0) << "index: " << i;
     ASSERT_FLOAT_EQ(markers.markers[0].points[i].y, 0.0) << "index: " << i;
   }
@@ -337,7 +338,7 @@ TEST(DebugVizTest, testJointToMarkersMultiJoint) {
   ASSERT_EQ(markers.markers[1].type, markers.markers[1].CUBE_LIST);
   ASSERT_EQ(markers.markers[1].points.size(), 4);
 
-  for (int i = 0; i < 4; i++) {
+  for (unsigned int i = 0; i < 4; i++) {
     ASSERT_FLOAT_EQ(markers.markers[1].points[i].x, 0.0) << "index: " << i;
     ASSERT_FLOAT_EQ(markers.markers[1].points[i].y, 0.0) << "index: " << i;
   }
@@ -399,7 +400,7 @@ struct MarkerArraySubscriptionHelper {
    */
   bool waitForMessageCount(int count) {
     ros::Rate rate(10);  // throttle check to 10Hz
-    for (int i = 0; i < 20; i++) {
+    for (unsigned int i = 0; i < 20; i++) {
       ros::spinOnce();
       if (count_ >= count) return true;
       rate.sleep();
@@ -410,6 +411,9 @@ struct MarkerArraySubscriptionHelper {
 
 // Test the bodyToMarkers method on an unsupported shape
 TEST(DebugVizTest, testPublishMarkers) {
+  flatland_server::Timekeeper timekeeper;
+  timekeeper.SetMaxStepSize(0.01);
+
   b2Vec2 gravity(0.0, 0.0);
   b2World world(gravity);
 
@@ -454,14 +458,14 @@ TEST(DebugVizTest, testPublishMarkers) {
   EXPECT_EQ(sub.getNumPublishers(), 1);
 
   // Publish
-  flatland_server::DebugVisualization::Get().Publish();
+  flatland_server::DebugVisualization::Get().Publish(timekeeper);
 
   // Verify that message was published
   EXPECT_TRUE(helper.waitForMessageCount(1));
   EXPECT_EQ(helper.markers_.markers.size(), 1);
 
   // Publish again (should have no change- nothing needs publishing)
-  flatland_server::DebugVisualization::Get().Publish();
+  flatland_server::DebugVisualization::Get().Publish(timekeeper);
 
   // Verify that message was published
   EXPECT_TRUE(helper.waitForMessageCount(1));
@@ -475,7 +479,7 @@ TEST(DebugVizTest, testPublishMarkers) {
   // inserts two markers
   flatland_server::DebugVisualization::Get().Visualize("example", joint, 1.0,
                                                        0.0, 0.0, 1.0);
-  flatland_server::DebugVisualization::Get().Publish();
+  flatland_server::DebugVisualization::Get().Publish(timekeeper);
 
   // Verify that message was published
   EXPECT_TRUE(helper.waitForMessageCount(2));    // Published twice
@@ -484,7 +488,7 @@ TEST(DebugVizTest, testPublishMarkers) {
   // Reset marker list, this empties the markers array, and topics having
   // empty markers are automatically deleted
   flatland_server::DebugVisualization::Get().Reset("example");
-  flatland_server::DebugVisualization::Get().Publish();
+  flatland_server::DebugVisualization::Get().Publish(timekeeper);
 
   // Verify that message was published
   EXPECT_TRUE(helper.waitForMessageCount(2));  // Published two times
@@ -492,7 +496,7 @@ TEST(DebugVizTest, testPublishMarkers) {
   // publish again with some contents, and the topic is created again
   flatland_server::DebugVisualization::Get().Visualize("example", joint, 1.0,
                                                        0.0, 0.0, 1.0);
-  flatland_server::DebugVisualization::Get().Publish();
+  flatland_server::DebugVisualization::Get().Publish(timekeeper);
 
   EXPECT_TRUE(helper.waitForMessageCount(3));
   EXPECT_EQ(2, helper.markers_.markers.size());

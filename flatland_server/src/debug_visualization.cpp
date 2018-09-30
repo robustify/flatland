@@ -78,7 +78,6 @@ void DebugVisualization::JointToMarkers(
 
   visualization_msgs::Marker marker;
   marker.header.frame_id = "map";
-  marker.header.stamp = ros::Time::now();
   marker.color.r = r;
   marker.color.g = g;
   marker.color.b = b;
@@ -127,7 +126,6 @@ void DebugVisualization::BodyToMarkers(visualization_msgs::MarkerArray& markers,
   while (fixture != NULL) {  // traverse fixture linked list
     visualization_msgs::Marker marker;
     marker.header.frame_id = "map";
-    marker.header.stamp = ros::Time::now();
     marker.id = markers.markers.size();
     marker.color.r = r;
     marker.color.g = g;
@@ -218,7 +216,7 @@ void DebugVisualization::BodyToMarkers(visualization_msgs::MarkerArray& markers,
   }
 }
 
-void DebugVisualization::Publish() {
+void DebugVisualization::Publish(const Timekeeper& timekeeper) {
   // Iterate over the topics_ map as pair(name, topic)
 
   std::vector<std::string> to_delete;
@@ -233,6 +231,10 @@ void DebugVisualization::Publish() {
     if (topic.second.markers.markers.size() == 0) {
       to_delete.push_back(topic.first);
     } else {
+      // Iterate the marker array to update all the timestamps
+      for (unsigned int i = 0; i < topic.second.markers.markers.size(); i++) {
+        topic.second.markers.markers[i].header.stamp = timekeeper.GetSimTime();
+      }
       topic.second.publisher.publish(topic.second.markers);
       topic.second.needs_publishing = false;
     }
@@ -240,10 +242,83 @@ void DebugVisualization::Publish() {
 
   if (to_delete.size() > 0) {
     for (const auto& topic : to_delete) {
+      ROS_WARN_NAMED("DebugVis", "Deleting topic %s", topic.c_str());
       topics_.erase(topic);
     }
     PublishTopicList();
   }
+}
+
+void DebugVisualization::VisualizeLayer(std::string name, Body* body) {
+  AddTopicIfNotExist(name);
+
+  b2Fixture* fixture = body->physics_body_->GetFixtureList();
+
+  visualization_msgs::Marker marker;
+  if (fixture == NULL) return;  // Nothing to visualize, empty linked list
+
+  while (fixture != NULL) {  // traverse fixture linked list
+
+    marker.header.frame_id = "map";
+    marker.id = topics_[name].markers.markers.size();
+    marker.color.r = body->color_.r;
+    marker.color.g = body->color_.g;
+    marker.color.b = body->color_.b;
+    marker.color.a = body->color_.a;
+    marker.scale.x = marker.scale.y = marker.scale.z = 1.0;
+    marker.frame_locked = true;
+    marker.pose.position.x = body->physics_body_->GetPosition().x;
+    marker.pose.position.y = body->physics_body_->GetPosition().y;
+
+    tf2::Quaternion q;  // use tf2 to convert 2d yaw -> 3d quaternion
+    q.setRPY(0, 0, body->physics_body_
+                       ->GetAngle());  // from euler angles: roll, pitch, yaw
+    marker.pose.orientation = tf2::toMsg(q);
+    marker.type = marker.TRIANGLE_LIST;
+
+    YamlReader reader(body->properties_);
+    YamlReader debug_reader =
+        reader.SubnodeOpt("debug", YamlReader::NodeTypeCheck::MAP);
+    float min_z = debug_reader.Get<float>("min_z", 0.0);
+    float max_z = debug_reader.Get<float>("max_z", 1.0);
+
+    // Get the shape from the fixture
+    if (fixture->GetType() == b2Shape::e_edge) {
+      geometry_msgs::Point p;  // b2Edge uses vertex1 and 2 for its edges
+      b2EdgeShape* edge = (b2EdgeShape*)fixture->GetShape();
+
+      p.x = edge->m_vertex1.x;
+      p.y = edge->m_vertex1.y;
+      p.z = min_z;
+      marker.points.push_back(p);
+      p.x = edge->m_vertex2.x;
+      p.y = edge->m_vertex2.y;
+      p.z = min_z;
+      marker.points.push_back(p);
+      p.x = edge->m_vertex2.x;
+      p.y = edge->m_vertex2.y;
+      p.z = max_z;
+      marker.points.push_back(p);
+
+      p.x = edge->m_vertex1.x;
+      p.y = edge->m_vertex1.y;
+      p.z = min_z;
+      marker.points.push_back(p);
+      p.x = edge->m_vertex2.x;
+      p.y = edge->m_vertex2.y;
+      p.z = max_z;
+      marker.points.push_back(p);
+      p.x = edge->m_vertex1.x;
+      p.y = edge->m_vertex1.y;
+      p.z = max_z;
+      marker.points.push_back(p);
+    }
+
+    fixture = fixture->GetNext();  // Traverse the linked list of fixtures
+  }
+
+  topics_[name].markers.markers.push_back(marker);  // Add the new marker
+  topics_[name].needs_publishing = true;
 }
 
 void DebugVisualization::Visualize(std::string name, b2Body* body, float r,

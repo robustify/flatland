@@ -84,7 +84,7 @@ void ModelTfPublisher::OnInitialize(const YAML::Node &config) {
     reference_body_ = GetModel()->bodies_[0];
   }
 
-  for (int i = 0; i < excluded_body_names.size(); i++) {
+  for (unsigned int i = 0; i < excluded_body_names.size(); i++) {
     Body *body = GetModel()->GetBody(excluded_body_names[i]);
 
     if (body == nullptr) {
@@ -119,14 +119,14 @@ void ModelTfPublisher::BeforePhysicsStep(const Timekeeper &timekeeper) {
   ref_tf_m << r.q.c, -r.q.s, r.p.x, r.q.s, r.q.c, r.p.y, 0, 0, 1;
 
   geometry_msgs::TransformStamped tf_stamped;
-  tf_stamped.header.stamp = ros::Time::now();
+  tf_stamped.header.stamp = timekeeper.GetSimTime();
 
   // loop through the bodies to calculate TF, and ignores excluded bodies
-  for (int i = 0; i < GetModel()->bodies_.size(); i++) {
+  for (unsigned int i = 0; i < GetModel()->bodies_.size(); i++) {
     Body *body = GetModel()->bodies_[i];
     bool is_excluded = false;
 
-    for (int j = 0; j < excluded_bodies_.size(); j++) {
+    for (unsigned int j = 0; j < excluded_bodies_.size(); j++) {
       if (body == excluded_bodies_[j]) {
         is_excluded = true;
       }

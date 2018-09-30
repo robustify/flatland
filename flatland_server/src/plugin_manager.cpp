@@ -64,10 +64,10 @@ PluginManager::PluginManager() {
 }
 
 PluginManager::~PluginManager() {
-  for (int i = 0; i < model_plugins_.size(); i++) {
+  for (unsigned int i = 0; i < model_plugins_.size(); i++) {
     model_plugins_[i].reset();  // deletes a shared pointer
   }
-  for (int j = 0; j < world_plugins_.size(); j++) {
+  for (unsigned int j = 0; j < world_plugins_.size(); j++) {
     world_plugins_[j].reset();  // deletes a shared pointer
   }
 
@@ -116,13 +116,30 @@ void PluginManager::LoadModelPlugin(Model *model, YamlReader &plugin_reader) {
                         " already exists");
   }
 
-  // remove the name and type of the YAML Node, the plugin does not need to know
+  try {
+    if (!plugin_reader.Get<bool>("enabled", "true")) {
+      ROS_WARN_STREAM("Plugin "
+                      << Q(model->name_) << "."
+                      << plugin_reader.Get<std::string>("name", "unnamed")
+                      << " disabled");
+      return;
+    }
+  } catch (...) {
+    ROS_WARN_STREAM("Body " << Q(model->name_) << "."
+                            << plugin_reader.Get<std::string>("name", "unnamed")
+                            << " enabled because flag failed to parse: "
+                            << plugin_reader.Get<std::string>("enabled"));
+  }
+
+  // remove the name, type and enabled of the YAML Node, the plugin does not
+  // need to know
   // about these parameters, remove method is broken in yaml cpp 5.2, so we
   // create a new node and add everything
   YAML::Node yaml_node;
   for (const auto &k : plugin_reader.Node()) {
     if (k.first.as<std::string>() != "name" &&
-        k.first.as<std::string>() != "type") {
+        k.first.as<std::string>() != "type" &&
+        k.first.as<std::string>() != "enabled") {
       yaml_node[k.first] = k.second;
     }
   }

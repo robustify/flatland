@@ -88,7 +88,7 @@ World::~World() {
   // The bodies of models are not set to null like layers because there aren't
   // nearly as many fixtures, and we might hide some memory problems by using
   // the shortcut
-  for (int i = 0; i < models_.size(); i++) {
+  for (unsigned int i = 0; i < models_.size(); i++) {
     delete models_[i];
   }
 
@@ -188,6 +188,8 @@ void World::LoadLayers(YamlReader &layers_reader) {
 
     boost::filesystem::path map_path(reader.Get<std::string>("map", ""));
     Color color = reader.GetColor("color", Color(1, 1, 1, 1));
+    auto properties =
+        reader.SubnodeOpt("properties", YamlReader::NodeTypeCheck::MAP).Node();
     reader.EnsureAccessedAllKeys();
 
     for (const auto &name : names) {
@@ -204,7 +206,7 @@ void World::LoadLayers(YamlReader &layers_reader) {
                    names[0].c_str(), map_path.string().c_str());
 
     Layer *layer = Layer::MakeLayer(physics_world_, &cfr_, map_path.string(),
-                                    names, color);
+                                    names, color, properties);
     layers_name_map_.insert(
         std::pair<std::vector<std::string>, Layer *>(names, layer));
     layers_.push_back(layer);
@@ -290,7 +292,7 @@ void World::LoadModel(const std::string &model_yaml_path, const std::string &ns,
 void World::DeleteModel(const std::string &name) {
   bool found = false;
 
-  for (int i = 0; i < models_.size(); i++) {
+  for (unsigned int i = 0; i < models_.size(); i++) {
     // name is unique, so there will only be one object with this name
     if (models_[i]->GetName() == name) {
       // delete the plugins associated with the model
@@ -313,7 +315,7 @@ void World::MoveModel(const std::string &name, const Pose &pose) {
   // Find desired model
   bool found = false;
 
-  for (int i = 0; i < models_.size(); i++) {
+  for (unsigned int i = 0; i < models_.size(); i++) {
     if (models_[i]->GetName() == name) {
       // move the model
       models_[i]->SetPose(pose);

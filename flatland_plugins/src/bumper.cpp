@@ -82,7 +82,7 @@ void Bumper::OnInitialize(const YAML::Node &config) {
 
   reader.EnsureAccessedAllKeys();
 
-  for (int i = 0; i < excluded_body_names.size(); i++) {
+  for (unsigned int i = 0; i < excluded_body_names.size(); i++) {
     Body *body = GetModel()->GetBody(excluded_body_names[i]);
 
     if (body == nullptr) {
@@ -131,7 +131,7 @@ void Bumper::AfterPhysicsStep(const Timekeeper &timekeeper) {
 
   flatland_msgs::Collisions collisions;
   collisions.header.frame_id = world_frame_id_;
-  collisions.header.stamp = ros::Time::now();
+  collisions.header.stamp = timekeeper.GetSimTime();
 
   // loop through all collisions in our record and publish
   for (it = contact_states_.begin(); it != contact_states_.end(); it++) {
@@ -200,7 +200,7 @@ void Bumper::BeginContact(b2Contact *contact) {
     bool ignore = false;
 
     // check that the body is not in the ignore list
-    for (int j = 0; j < excluded_bodies_.size(); j++) {
+    for (unsigned int j = 0; j < excluded_bodies_.size(); j++) {
       if (excluded_bodies_[j] == collision_body) {
         ignore = true;
         break;

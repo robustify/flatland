@@ -129,7 +129,7 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   odom_msg_ = ground_truth_msg_;
 
   // copy from std::array to boost array
-  for (int i = 0; i < 36; i++) {
+  for (unsigned int i = 0; i < 36; i++) {
     odom_msg_.twist.covariance[i] = odom_twist_covar[i];
     odom_msg_.pose.covariance[i] = odom_pose_covar[i];
   }
@@ -137,13 +137,13 @@ void DiffDrive::OnInitialize(const YAML::Node& config) {
   // init the random number generators
   std::random_device rd;
   rng_ = std::default_random_engine(rd());
-  for (int i = 0; i < 3; i++) {
+  for (unsigned int i = 0; i < 3; i++) {
     // variance is standard deviation squared
     noise_gen_[i] =
         std::normal_distribution<double>(0.0, sqrt(odom_pose_noise[i]));
   }
 
-  for (int i = 0; i < 3; i++) {
+  for (unsigned int i = 0; i < 3; i++) {
     noise_gen_[i + 3] =
         std::normal_distribution<double>(0.0, sqrt(odom_twist_noise[i]));
   }
@@ -174,7 +174,7 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
         b2body->GetLinearVelocityFromLocalPoint(b2Vec2(0, 0));
     float angular_vel = b2body->GetAngularVelocity();
 
-    ground_truth_msg_.header.stamp = ros::Time::now();
+    ground_truth_msg_.header.stamp = timekeeper.GetSimTime();
     ground_truth_msg_.pose.pose.position.x = position.x;
     ground_truth_msg_.pose.pose.position.y = position.y;
     ground_truth_msg_.pose.pose.position.z = 0;
@@ -188,7 +188,7 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
     ground_truth_msg_.twist.twist.angular.z = angular_vel;
 
     // add the noise to odom messages
-    odom_msg_.header.stamp = ros::Time::now();
+    odom_msg_.header.stamp = timekeeper.GetSimTime();
     odom_msg_.pose.pose = ground_truth_msg_.pose.pose;
     odom_msg_.twist.twist = ground_truth_msg_.twist.twist;
     odom_msg_.pose.pose.position.x += noise_gen_[0](rng_);
@@ -218,7 +218,7 @@ void DiffDrive::BeforePhysicsStep(const Timekeeper& timekeeper) {
       // Transform global frame velocity into local frame to simulate encoder
       // readings
       geometry_msgs::TwistStamped twist_pub_msg;
-      twist_pub_msg.header.stamp = ros::Time::now();
+      twist_pub_msg.header.stamp = timekeeper.GetSimTime();
       twist_pub_msg.header.frame_id = odom_msg_.child_frame_id;
 
       // Forward velocity in twist.linear.x

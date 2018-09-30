@@ -72,7 +72,7 @@ void Laser::OnInitialize(const YAML::Node &config) {
   double x = origin_.x, y = origin_.y;
   m_body_to_laser_ << c, -s, x, s, c, y, 0, 0, 1;
 
-  int num_laser_points =
+  unsigned int num_laser_points =
       std::lround((max_angle_ - min_angle_) / increment_) + 1;
 
   // initialize size for the matrix storing the laser points
@@ -82,7 +82,7 @@ void Laser::OnInitialize(const YAML::Node &config) {
 
   // pre-calculate the laser points w.r.t to the laser frame, since this never
   // changes
-  for (int i = 0; i < num_laser_points; i++) {
+  for (unsigned int i = 0; i < num_laser_points; i++) {
     float angle = min_angle_ + i * increment_;
 
     float x = range_ * cos(angle);
@@ -136,12 +136,12 @@ void Laser::BeforePhysicsStep(const Timekeeper &timekeeper) {
   // only compute and publish when the number of subscribers is not zero
   if (scan_publisher_.getNumSubscribers() > 0) {
     ComputeLaserRanges();
-    laser_scan_.header.stamp = ros::Time::now();
+    laser_scan_.header.stamp = timekeeper.GetSimTime();
     scan_publisher_.publish(laser_scan_);
   }
 
   if (broadcast_tf_) {
-    laser_tf_.header.stamp = ros::Time::now();
+    laser_tf_.header.stamp = timekeeper.GetSimTime();
     tf_broadcaster_.sendTransform(laser_tf_);
   }
 }
@@ -161,42 +161,54 @@ void Laser::ComputeLaserRanges() {
   v_world_laser_origin_ = m_world_to_laser_ * v_zero_point_;
 
   // Conver to Box2D data types
-  b2Vec2 laser_point;
   b2Vec2 laser_origin_point(v_world_laser_origin_(0), v_world_laser_origin_(1));
 
-  // loop through the laser points and call the Box2D world raycast
-  for (int i = 0; i < laser_scan_.ranges.size(); ++i) {
-    laser_point.x = m_world_laser_points_(0, i);
-    laser_point.y = m_world_laser_points_(1, i);
+  // Results vector
+  std::vector<std::future<std::pair<double, double>>> results(
+      laser_scan_.ranges.size());
 
-    did_hit_ = false;
-    intensity_ = 0.0;
+  // loop through the laser points and call the Box2D world raycast by
+  // enqueueing the callback
+  for (unsigned int i = 0; i < laser_scan_.ranges.size(); ++i) {
+    results[i] =
+        pool_.enqueue([i, this, laser_origin_point] {  // Lambda function
+          b2Vec2 laser_point;
+          laser_point.x = m_world_laser_points_(0, i);
+          laser_point.y = m_world_laser_points_(1, i);
+          LaserCallback cb(this);
 
-    GetModel()->GetPhysicsWorld()->RayCast(this, laser_origin_point,
-                                           laser_point);
+          GetModel()->GetPhysicsWorld()->RayCast(&cb, laser_origin_point,
+                                                 laser_point);
 
-    if (!did_hit_) {
-      laser_scan_.ranges[i] = NAN;
-      if (reflectance_layers_bits_) laser_scan_.intensities[i] = 0;
-    } else {
-      laser_scan_.ranges[i] = fraction_ * range_ + noise_gen_(rng_);
-      if (reflectance_layers_bits_) laser_scan_.intensities[i] = intensity_;
-    }
+          if (!cb.did_hit_) {
+            return std::make_pair<double, double>(NAN, 0);
+          } else {
+            return std::make_pair<double, double>(cb.fraction_ * this->range_,
+                                                  cb.intensity_);
+          }
+        });
+  }
+
+  // Unqueue all of the future'd results
+  for (unsigned int i = 0; i < laser_scan_.ranges.size(); ++i) {
+    auto result = results[i].get();  // Pull the result from the future
+    laser_scan_.ranges[i] = result.first + this->noise_gen_(this->rng_);
+    if (reflectance_layers_bits_) laser_scan_.intensities[i] = result.second;
   }
 }
 
-float Laser::ReportFixture(b2Fixture *fixture, const b2Vec2 &point,
-                           const b2Vec2 &normal, float fraction) {
+float LaserCallback::ReportFixture(b2Fixture *fixture, const b2Vec2 &point,
+                                   const b2Vec2 &normal, float fraction) {
   uint16_t category_bits = fixture->GetFilterData().categoryBits;
   // only register hit in the specified layers
-  if (!(category_bits & layers_bits_)) {
+  if (!(category_bits & parent_->layers_bits_)) {
     return -1.0f;  // return -1 to ignore this hit
   }
 
   // Don't return on hitting sensors... they're not real
   if (fixture->IsSensor()) return -1.0f;
 
-  if (category_bits & reflectance_layers_bits_) {
+  if (category_bits & parent_->reflectance_layers_bits_) {
     intensity_ = 255.0;
   }
 

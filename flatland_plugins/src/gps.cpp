@@ -28,12 +28,12 @@ void Gps::BeforePhysicsStep(const Timekeeper &timekeeper) {
   // only compute and publish when the number of subscribers is not zero
   if (fix_publisher_.getNumSubscribers() > 0) {
     UpdateFix();
-    gps_fix_.header.stamp = ros::Time::now();
+    gps_fix_.header.stamp = timekeeper.GetSimTime();
     fix_publisher_.publish(gps_fix_);
   }
 
   if (broadcast_tf_) {
-    gps_tf_.header.stamp = ros::Time::now();
+    gps_tf_.header.stamp = timekeeper.GetSimTime();
     tf_broadcaster_.sendTransform(gps_tf_);
   }
 }
@@ -77,7 +77,7 @@ void Gps::UpdateFix() {
   double alt;
   double p = sqrt(ecef_x * ecef_x + ecef_y * ecef_y);
   double lat_rad = atan(p / ecef_z);
-  for (int i = 0; i < 4; i++) {
+  for (unsigned int i = 0; i < 4; i++) {
     double s_lat = sin(lat_rad);
     r = WGS84_A / sqrt(1.0 - WGS84_E2 * s_lat * s_lat);
     alt = p / cos(lat_rad) - r;
