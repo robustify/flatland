@@ -54,6 +54,7 @@
 #include <thirdparty/ThreadPool.h>
 #include <visualization_msgs/Marker.h>
 #include <Eigen/Dense>
+#include <random>
 #include <thread>
 
 #ifndef FLATLAND_PLUGINS_LASER_H
